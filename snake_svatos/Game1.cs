@@ -1,10 +1,8 @@
 ﻿using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework.Input;
+using System;
 using System.Collections.Generic;
-using Snake1v1.Entities;
-
-
 
 namespace Snake1v1
 {
@@ -12,82 +10,136 @@ namespace Snake1v1
     {
         GraphicsDeviceManager graphics;
         SpriteBatch spriteBatch;
-        public static Texture2D Pixel;
 
-        public static AI BotRef;
+        public static Texture2D Pixel; // kvůli Item a Snake
+        const int tileSize = 20;
+        const int gridWidth = 40;
+        const int gridHeight = 30;
 
-        Snake player;
-        AI bot;
-        List<Item> items = new List<Item>();
+        Vector2 direction = new Vector2(1, 0);
+        List<Vector2> snake = new List<Vector2>();
+        Vector2 food;
+        double moveTimer = 0;
+        double moveInterval = 150; // ms
+
+        Random random = new Random();
+        bool gameOver = false;
+        SpriteFont font;
 
         public Game1()
         {
             graphics = new GraphicsDeviceManager(this);
             Content.RootDirectory = "Content";
+            IsMouseVisible = true;
+            graphics.PreferredBackBufferWidth = gridWidth * tileSize;
+            graphics.PreferredBackBufferHeight = gridHeight * tileSize;
         }
 
         protected override void Initialize()
         {
-            player = new Snake(new Vector2(100, 100));
-            bot = new AI(new Vector2(400, 100));
-            BotRef = bot;
-
-            // spawn itemů
-            items.Add(new Item(new Vector2(200, 200), ItemType.Food));
-            items.Add(new Item(new Vector2(300, 300), ItemType.Weapon));
-
+            snake.Clear();
+            snake.Add(new Vector2(10, 10));
+            SpawnFood();
             base.Initialize();
         }
 
         protected override void LoadContent()
         {
             spriteBatch = new SpriteBatch(GraphicsDevice);
-
             Pixel = new Texture2D(GraphicsDevice, 1, 1);
             Pixel.SetData(new[] { Color.White });
+            try { font = Content.Load<SpriteFont>("DefaultFont"); } catch { font = null; }
         }
 
         protected override void Update(GameTime gameTime)
         {
-            if (Keyboard.GetState().IsKeyDown(Keys.Escape)) Exit();
+            if (Keyboard.GetState().IsKeyDown(Keys.Escape))
+                Exit();
+
+            if (gameOver)
+            {
+                if (Keyboard.GetState().IsKeyDown(Keys.Enter))
+                {
+                    gameOver = false;
+                    Initialize();
+                }
+                return;
+            }
 
             var ks = Keyboard.GetState();
-            if (ks.IsKeyDown(Keys.Up)) player.CurrentDirection = Direction.Up;
-            if (ks.IsKeyDown(Keys.Down)) player.CurrentDirection = Direction.Down;
-            if (ks.IsKeyDown(Keys.Left)) player.CurrentDirection = Direction.Left;
-            if (ks.IsKeyDown(Keys.Right)) player.CurrentDirection = Direction.Right;
+            if (ks.IsKeyDown(Keys.Up) && direction.Y == 0) direction = new Vector2(0, -1);
+            if (ks.IsKeyDown(Keys.Down) && direction.Y == 0) direction = new Vector2(0, 1);
+            if (ks.IsKeyDown(Keys.Left) && direction.X == 0) direction = new Vector2(-1, 0);
+            if (ks.IsKeyDown(Keys.Right) && direction.X == 0) direction = new Vector2(1, 0);
 
-            player.Update(gameTime);
-            bot.Update(gameTime);
-
-            foreach (var item in items.ToArray())
+            moveTimer += gameTime.ElapsedGameTime.TotalMilliseconds;
+            if (moveTimer >= moveInterval)
             {
-                if (Vector2.Distance(player.Position, item.Position) < 20)
-                {
-                    player.OnCollision(item);
-                    items.Remove(item);
-                }
-
-                if (Vector2.Distance(bot.Position, item.Position) < 20)
-                {
-                    bot.OnCollision(item);
-                    items.Remove(item);
-                }
+                MoveSnake();
+                moveTimer = 0;
             }
 
             base.Update(gameTime);
         }
 
+        void MoveSnake()
+        {
+            Vector2 newHead = snake[0] + direction;
+
+            // narazil do zdi?
+            if (newHead.X < 0 || newHead.Y < 0 || newHead.X >= gridWidth || newHead.Y >= gridHeight)
+            {
+                gameOver = true;
+                return;
+            }
+
+            // narazil do sebe?
+            foreach (var part in snake)
+                if (part == newHead) { gameOver = true; return; }
+
+            snake.Insert(0, newHead);
+
+            // snědl jídlo?
+            if (newHead == food)
+                SpawnFood();
+            else
+                snake.RemoveAt(snake.Count - 1);
+        }
+
+        void SpawnFood()
+        {
+            Vector2 pos;
+            do
+            {
+                pos = new Vector2(random.Next(0, gridWidth), random.Next(0, gridHeight));
+            } while (snake.Contains(pos));
+            food = pos;
+        }
+
         protected override void Draw(GameTime gameTime)
         {
-            GraphicsDevice.Clear(Color.CornflowerBlue);
-
+            GraphicsDevice.Clear(Color.Black);
             spriteBatch.Begin();
-            player.Draw(spriteBatch);
-            bot.Draw(spriteBatch);
-            foreach (var item in items) item.Draw(spriteBatch);
-            spriteBatch.End();
 
+            // jídlo
+            spriteBatch.Draw(Pixel, new Rectangle((int)food.X * tileSize, (int)food.Y * tileSize, tileSize, tileSize), Color.Red);
+
+            // had
+            for (int i = 0; i < snake.Count; i++)
+            {
+                var color = i == 0 ? Color.LimeGreen : Color.Green;
+                spriteBatch.Draw(Pixel, new Rectangle((int)snake[i].X * tileSize, (int)snake[i].Y * tileSize, tileSize - 1, tileSize - 1), color);
+            }
+
+            // Game over text
+            if (gameOver && font != null)
+            {
+                string msg = "GAME OVER - Press ENTER";
+                var size = font.MeasureString(msg);
+                spriteBatch.DrawString(font, msg, new Vector2((graphics.PreferredBackBufferWidth - size.X) / 2, 200), Color.White);
+            }
+
+            spriteBatch.End();
             base.Draw(gameTime);
         }
     }
