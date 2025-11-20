@@ -5,50 +5,62 @@ using System;
 using System.Collections.Generic;
 
 namespace Snake1v1
+
 {
     public class Game1 : Game
     {
         GraphicsDeviceManager graphics;
         SpriteBatch spriteBatch;
 
-        public static Texture2D Pixel; // kvůli Item a Snake
-        const int tileSize = 20;
-        const int gridWidth = 40;
-        const int gridHeight = 30;
+        public static Texture2D Pixel;
 
-        Vector2 direction = new Vector2(1, 0);
-        List<Vector2> snake = new List<Vector2>();
-        Vector2 food;
-        double moveTimer = 0;
-        double moveInterval = 150; // ms
+        const int CELL = 20;
+        const int WIDTH = 32;
+        const int HEIGHT = 24;
 
-        Random random = new Random();
+        List<Point> snake = new List<Point>();
+        Point direction = new Point(1, 0);
+
+        Random rnd = new Random();
+        Point food;
+
+        double timer = 0;
+        double step = 0.15; // <<< POMALÝ POHYB
+
         bool gameOver = false;
-        SpriteFont font;
 
         public Game1()
         {
             graphics = new GraphicsDeviceManager(this);
             Content.RootDirectory = "Content";
             IsMouseVisible = true;
-            graphics.PreferredBackBufferWidth = gridWidth * tileSize;
-            graphics.PreferredBackBufferHeight = gridHeight * tileSize;
+
+            graphics.PreferredBackBufferWidth = WIDTH * CELL;
+            graphics.PreferredBackBufferHeight = HEIGHT * CELL;
         }
 
         protected override void Initialize()
         {
-            snake.Clear();
-            snake.Add(new Vector2(10, 10));
-            SpawnFood();
+            Pixel = new Texture2D(GraphicsDevice, 1, 1);
+            Pixel.SetData(new[] { Color.White });
+
+            ResetGame();
+
             base.Initialize();
         }
 
-        protected override void LoadContent()
+        void ResetGame()
         {
-            spriteBatch = new SpriteBatch(GraphicsDevice);
-            Pixel = new Texture2D(GraphicsDevice, 1, 1);
-            Pixel.SetData(new[] { Color.White });
-            try { font = Content.Load<SpriteFont>("DefaultFont"); } catch { font = null; }
+            snake.Clear();
+            snake.Add(new Point(WIDTH / 2, HEIGHT / 2));
+            direction = new Point(1, 0);
+            SpawnFood();
+            gameOver = false;
+        }
+
+        void SpawnFood()
+        {
+            food = new Point(rnd.Next(0, WIDTH), rnd.Next(0, HEIGHT));
         }
 
         protected override void Update(GameTime gameTime)
@@ -58,85 +70,80 @@ namespace Snake1v1
 
             if (gameOver)
             {
-                if (Keyboard.GetState().IsKeyDown(Keys.Enter))
-                {
-                    gameOver = false;
-                    Initialize();
-                }
+                if (Keyboard.GetState().IsKeyDown(Keys.Space))
+                    ResetGame();
                 return;
             }
 
-            var ks = Keyboard.GetState();
-            if (ks.IsKeyDown(Keys.Up) && direction.Y == 0) direction = new Vector2(0, -1);
-            if (ks.IsKeyDown(Keys.Down) && direction.Y == 0) direction = new Vector2(0, 1);
-            if (ks.IsKeyDown(Keys.Left) && direction.X == 0) direction = new Vector2(-1, 0);
-            if (ks.IsKeyDown(Keys.Right) && direction.X == 0) direction = new Vector2(1, 0);
+            HandleInput();
 
-            moveTimer += gameTime.ElapsedGameTime.TotalMilliseconds;
-            if (moveTimer >= moveInterval)
+            timer += gameTime.ElapsedGameTime.TotalSeconds;
+            if (timer >= step)
             {
+                timer = 0;
                 MoveSnake();
-                moveTimer = 0;
             }
 
             base.Update(gameTime);
         }
 
+        void HandleInput()
+        {
+            var k = Keyboard.GetState();
+
+            if (k.IsKeyDown(Keys.Up) && direction.Y != 1) direction = new Point(0, -1);
+            if (k.IsKeyDown(Keys.Down) && direction.Y != -1) direction = new Point(0, 1);
+            if (k.IsKeyDown(Keys.Left) && direction.X != 1) direction = new Point(-1, 0);
+            if (k.IsKeyDown(Keys.Right) && direction.X != -1) direction = new Point(1, 0);
+        }
+
         void MoveSnake()
         {
-            Vector2 newHead = snake[0] + direction;
+            Point head = snake[0];
+            Point newHead = new Point(head.X + direction.X, head.Y + direction.Y);
 
-            // narazil do zdi?
-            if (newHead.X < 0 || newHead.Y < 0 || newHead.X >= gridWidth || newHead.Y >= gridHeight)
+            // kolize se zdí
+            if (newHead.X < 0 || newHead.Y < 0 || newHead.X >= WIDTH || newHead.Y >= HEIGHT)
             {
                 gameOver = true;
                 return;
             }
 
-            // narazil do sebe?
-            foreach (var part in snake)
-                if (part == newHead) { gameOver = true; return; }
+            // kolize se sebou
+            if (snake.Contains(newHead))
+            {
+                gameOver = true;
+                return;
+            }
 
             snake.Insert(0, newHead);
 
-            // snědl jídlo?
+            // jídlo?
             if (newHead == food)
                 SpawnFood();
             else
                 snake.RemoveAt(snake.Count - 1);
         }
 
-        void SpawnFood()
-        {
-            Vector2 pos;
-            do
-            {
-                pos = new Vector2(random.Next(0, gridWidth), random.Next(0, gridHeight));
-            } while (snake.Contains(pos));
-            food = pos;
-        }
-
         protected override void Draw(GameTime gameTime)
         {
             GraphicsDevice.Clear(Color.Black);
+            spriteBatch = new SpriteBatch(GraphicsDevice);
             spriteBatch.Begin();
 
-            // jídlo
-            spriteBatch.Draw(Pixel, new Rectangle((int)food.X * tileSize, (int)food.Y * tileSize, tileSize, tileSize), Color.Red);
+            // food
+            spriteBatch.Draw(Pixel, new Rectangle(food.X * CELL, food.Y * CELL, CELL, CELL), Color.Red);
 
-            // had
-            for (int i = 0; i < snake.Count; i++)
-            {
-                var color = i == 0 ? Color.LimeGreen : Color.Green;
-                spriteBatch.Draw(Pixel, new Rectangle((int)snake[i].X * tileSize, (int)snake[i].Y * tileSize, tileSize - 1, tileSize - 1), color);
-            }
+            // snake
+            foreach (var p in snake)
+                spriteBatch.Draw(Pixel, new Rectangle(p.X * CELL, p.Y * CELL, CELL, CELL), Color.Lime);
 
-            // Game over text
-            if (gameOver && font != null)
+            if (gameOver)
             {
-                string msg = "GAME OVER - Press ENTER";
-                var size = font.MeasureString(msg);
-                spriteBatch.DrawString(font, msg, new Vector2((graphics.PreferredBackBufferWidth - size.X) / 2, 200), Color.White);
+                spriteBatch.DrawString(Content.Load<SpriteFont>("DefaultFont"),
+                    "GAME OVER\nPress SPACE to restart",
+                    new Vector2(100, 200),
+                    Color.White);
             }
 
             spriteBatch.End();

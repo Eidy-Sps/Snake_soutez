@@ -5,57 +5,48 @@ using System.Collections.Generic;
 
 namespace Snake1v1.Entities
 {
-    public enum Direction { Up, Down, Left, Right }
-
-    public class Snake : Character
+    public class Snake : IEntity
     {
-        public List<Vector2> Body = new List<Vector2>();
-        public Direction CurrentDirection = Direction.Right;
+        public List<Point> Body = new List<Point>();
+        public Point Direction = new Point(1, 0);
+        public Color Color;
 
-        public Snake(Vector2 startPosition)
+        public Snake(Point startPos, Color color)
         {
-            Position = startPosition;
-            Body.Add(Position);
+            Body.Add(startPos);
+            Color = color;
         }
 
-        public override void Update(GameTime gameTime)
+        public virtual void Update(GameTime gameTime)
         {
-            Vector2 movement = Vector2.Zero;
-            switch (CurrentDirection)
-            {
-                case Direction.Up: movement = new Vector2(0, -Speed); break;
-                case Direction.Down: movement = new Vector2(0, Speed); break;
-                case Direction.Left: movement = new Vector2(-Speed, 0); break;
-                case Direction.Right: movement = new Vector2(Speed, 0); break;
-            }
+            Point head = Body[0];
+            Point newHead = new Point(head.X + Direction.X * 20, head.Y + Direction.Y * 20);
 
-            Position += movement;
-            Body.Insert(0, Position);
+            Body.Insert(0, newHead);
             Body.RemoveAt(Body.Count - 1);
         }
 
-        public override void Draw(SpriteBatch spriteBatch)
+        public void Grow()
         {
-            foreach (var segment in Body)
-            {
-                spriteBatch.Draw(Game1.Pixel, new Rectangle((int)segment.X, (int)segment.Y, 20, 20), Color.Green);
-            }
+            Body.Add(Body[Body.Count - 1]);
         }
 
-        public override void OnCollision(IEntity other)
+        public bool CheckSelfCollision()
         {
-            if (other is Item item)
-            {
-                if (item.Type == ItemType.Food)
-                {
-                    Body.Add(Body[Body.Count - 1]); // prodloužení hada
-                }
-                else if (item.Type == ItemType.Weapon)
-                {
-                    // zpomalíme AI
-                    Game1.BotRef.SlowTimer = 120; // cca 2 sekundy
-                }
-            }
+            Point head = Body[0];
+            for (int i = 1; i < Body.Count; i++)
+                if (Body[i] == head)
+                    return true;
+
+            return false;
         }
+
+        public virtual void Draw(SpriteBatch spriteBatch)
+        {
+            foreach (var p in Body)
+                spriteBatch.Draw(Game1.Pixel, new Rectangle(p.X, p.Y, 20, 20), Color);
+        }
+
+        public void OnCollision(IEntity other) { }
     }
 }

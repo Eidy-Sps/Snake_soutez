@@ -21,8 +21,8 @@ namespace Snake1v1.Entities
 
         public void Draw(SpriteBatch spriteBatch)
         {
-            Color color = Type == ItemType.Food ? Color.Red : Color.Yellow;
-            spriteBatch.Draw(Game1.Pixel, new Rectangle((int)Position.X, (int)Position.Y, 20, 20), color);
+            Color c = Type == ItemType.Food ? Color.Red : Color.Yellow;
+            spriteBatch.Draw(Game1.Pixel, new Rectangle((int)Position.X, (int)Position.Y, 20, 20), c);
         }
 
         public void OnCollision(IEntity other) { }

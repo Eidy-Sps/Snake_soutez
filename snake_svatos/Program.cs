@@ -1,4 +1,15 @@
 ﻿using Snake1v1;
+using System;
 
-using var game = new Game1();
-game.Run();
+namespace SnakeTwoPlayers
+{
+    public static class Program
+    {
+        [STAThread]
+        static void Main()
+        {
+            using (var game = new Game1())
+                game.Run();
+        }
+    }
+}
