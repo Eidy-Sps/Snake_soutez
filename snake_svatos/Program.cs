@@ -1,7 +1,6 @@
-﻿using Snake1v1;
-using System;
+﻿using System;
 
-namespace SnakeTwoPlayers
+namespace MonoGameSnake
 {
     public static class Program
     {
